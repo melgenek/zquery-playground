@@ -9,7 +9,7 @@ object Sources {
 
   case class GetPayment(id: Long) extends Request[Nothing, Payment]
   val paymentSource = DataSource.fromFunctionBatchedOptionM("PaymentSource") { requests: Chunk[GetPayment] =>
-    ZIO.succeed(List(Payment(111, "sample111")))
+    ZIO.succeed(List(Payment(222, "sample222")))
       .map { payments =>
         requests.map(req => payments.find(_.id == req.id))
       }
@@ -21,7 +21,7 @@ object Sources {
 
   case class GetAddress(id: Long) extends Request[Nothing, Address]
   val addressSource = DataSource.fromFunctionBatchedOptionM("AddressSource") { requests: Chunk[GetAddress] =>
-    ZIO.succeed(List(Address(222, "sample222")))
+    ZIO.succeed(List(Address(111, "sample111")))
       .map { addresses => requests.map(req => addresses.find(_.id == req.id)) }
   }
 
