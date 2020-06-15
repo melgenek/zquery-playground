@@ -1,5 +1,7 @@
-import zio.query.{DataSource, RQuery, Request, UQuery, ZQuery}
+import zio.query.{DataSource, RQuery, Request, ZQuery}
 import zio.{Chunk, Has, Runtime, ZIO}
+
+import scala.util.Random
 
 case class Bearer(value: String)
 
@@ -9,15 +11,18 @@ case class Payment(id: Long, name: String)
 
 object Sources {
 
+  val totalCount = 15000
+
   type HasToken = Has[Bearer]
 
   case class GetPayment(id: Long) extends Request[Nothing, Payment]
   val paymentSource: DataSource[HasToken, GetPayment] =
     DataSource.fromFunctionBatchedOptionM("PaymentSource") { requests: Chunk[GetPayment] =>
-      ZIO.succeed(List(Payment(222, "sample222")))
-        .map { payments =>
-          requests.map(req => payments.find(_.id == req.id))
-        }
+      ZIO.succeed(
+        List.tabulate(totalCount)(Payment(_, "payment name"))
+      ).map { payments =>
+        requests.map(req => payments.find(_.id == req.id))
+      }
     }
 
   def getPayment(id: Long): RQuery[HasToken, Payment] = {
@@ -27,8 +32,11 @@ object Sources {
   case class GetAddress(id: Long) extends Request[Nothing, Address]
   val addressSource: DataSource[HasToken, GetAddress] =
     DataSource.fromFunctionBatchedOptionM("AddressSource") { requests: Chunk[GetAddress] =>
-      ZIO.succeed(List(Address(111, "sample111")))
-        .map { addresses => requests.map(req => addresses.find(_.id == req.id)) }
+      ZIO.succeed(
+        List.tabulate(totalCount)(Address(_, "street"))
+      ).map {
+        addresses => requests.map(req => addresses.find(_.id == req.id))
+      }
     }
 
   def getAddress(id: Long): RQuery[HasToken, Address] = {
@@ -41,7 +49,9 @@ object Main extends App {
 
   val bearerToken = Bearer("any")
   val result = for {
-    users <- ZQuery.fromEffect(ZIO.succeed(List(User(1, "user1", 111, 222))))
+    users <- ZQuery.fromEffect(ZIO.succeed(
+      List.tabulate(Sources.totalCount)(id => User(id, "user name", id, id))
+    ))
     richUsers <- ZQuery.foreachPar(users) { user =>
       Sources.getPayment(user.paymentId)
         .zipPar(Sources.getAddress(user.addressId))
@@ -49,7 +59,7 @@ object Main extends App {
           (user, payment, address)
         }
     }
-  } yield richUsers
+  } yield richUsers.size
 
   println(Runtime.default.unsafeRun(result.run.provide(Has(bearerToken))))
 
