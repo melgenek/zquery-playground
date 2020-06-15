@@ -1,7 +1,6 @@
-import zio.query.{DataSource, RQuery, Request, ZQuery}
-import zio.{Chunk, Has, Runtime, ZIO}
+import zio.query.{DataSource, RQuery, Request, UQuery, ZQuery}
+import zio.{Chunk, Runtime, ZIO}
 
-import scala.util.Random
 
 case class Bearer(value: String)
 
@@ -13,10 +12,8 @@ object Sources {
 
   val totalCount = 15000
 
-  type HasToken = Has[Bearer]
-
   case class GetPayment(id: Long) extends Request[Nothing, Payment]
-  val paymentSource: DataSource[HasToken, GetPayment] =
+  val paymentSource: DataSource[Any, GetPayment] =
     DataSource.fromFunctionBatchedOptionM("PaymentSource") { requests: Chunk[GetPayment] =>
       ZIO.succeed(
         List.tabulate(totalCount)(Payment(_, "payment name"))
@@ -25,12 +22,12 @@ object Sources {
       }
     }
 
-  def getPayment(id: Long): RQuery[HasToken, Payment] = {
+  def getPayment(id: Long): UQuery[Payment] = {
     ZQuery.fromRequest(GetPayment(id))(paymentSource)
   }
 
   case class GetAddress(id: Long) extends Request[Nothing, Address]
-  val addressSource: DataSource[HasToken, GetAddress] =
+  val addressSource: DataSource[Any, GetAddress] =
     DataSource.fromFunctionBatchedOptionM("AddressSource") { requests: Chunk[GetAddress] =>
       ZIO.succeed(
         List.tabulate(totalCount)(Address(_, "street"))
@@ -39,7 +36,7 @@ object Sources {
       }
     }
 
-  def getAddress(id: Long): RQuery[HasToken, Address] = {
+  def getAddress(id: Long): UQuery[Address] = {
     ZQuery.fromRequest(GetAddress(id))(addressSource)
   }
 
@@ -47,7 +44,6 @@ object Sources {
 
 object Main extends App {
 
-  val bearerToken = Bearer("any")
   val result = for {
     users <- ZQuery.fromEffect(ZIO.succeed(
       List.tabulate(Sources.totalCount)(id => User(id, "user name", id, id))
@@ -61,6 +57,6 @@ object Main extends App {
     }
   } yield richUsers.size
 
-  println(Runtime.default.unsafeRun(result.run.provide(Has(bearerToken))))
+  println(Runtime.default.unsafeRun(result.run))
 
 }
